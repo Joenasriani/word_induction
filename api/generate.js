@@ -8,8 +8,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'systemPrompt and userQuery are required.' });
   }
 
-  const roundtableApi = process.env.ROUNDTABLE_API;
-  const openRouterApiKey = process.env.WORD_INDUCTION_API;
+  const roundtableApi = (process.env.ROUNDTABLE_API || '').trim();
+  const openRouterApiKey = normalizeApiKey(process.env.WORD_INDUCTION_API);
   const openRouterModel = process.env.WORD_INDUCTION_MODEL || 'openrouter/auto';
 
   if (!roundtableApi && !openRouterApiKey) {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ systemPrompt, userQuery })
       });
     } else {
-      const apiKey = openRouterApiKey || roundtableApi;
+      const apiKey = openRouterApiKey || normalizeApiKey(roundtableApi);
       response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -47,7 +47,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+      const apiError = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+      const hint = /user not found/i.test(String(apiError))
+        ? ' (check WORD_INDUCTION_API: use your raw OpenRouter key, not model name, URL, or Bearer prefix)'
+        : '';
+      throw new Error(`${apiError}${hint}`);
     }
 
     const data = await response.json();
@@ -55,4 +59,12 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Unknown server error' });
   }
+}
+
+function normalizeApiKey(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^Bearer\s+/i, '');
 }
