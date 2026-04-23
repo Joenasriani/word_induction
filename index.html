@@ -196,7 +196,7 @@ const App = () => {
     const [inductionScript, setInductionScript] = useState('');
     const [inductionMode, setInductionMode] = useState('script'); 
     const [isGenerating, setIsGenerating] = useState(false);
-    const [apiKey, setApiKey] = useState('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'); 
+    const [apiKey, setApiKey] = useState(''); 
     const [showConfig, setShowConfig] = useState(false);
     const [isDecoding, setIsDecoding] = useState(false);
 
@@ -226,7 +226,7 @@ const App = () => {
         (async () => {
             const conf = await dbGet('config', 'api');
             if (conf && conf.key) setApiKey(conf.key);
-            else setApiKey('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');
+            else setApiKey('');
             const bg = await dbGet('assets', 'bg');
             if (bg) setBgFile({ name: bg.name, data: bg.data });
             const vc = await dbGet('assets', 'voice');
