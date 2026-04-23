@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   const { systemPrompt, userQuery } = req.body;
-  const apiKey = process.env.OPENROUTER_API_KEY; 
+  const apiKey = process.env.WORD_INDUCTION_API; 
 
   if (!apiKey) {
     return res.status(500).json({ error: 'Server configuration error: API key missing from environment variables.' });
