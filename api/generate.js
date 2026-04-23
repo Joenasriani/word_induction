@@ -9,10 +9,11 @@ export default async function handler(req, res) {
   }
 
   const roundtableApi = process.env.ROUNDTABLE_API;
-  const fallbackApiKey = process.env.WORD_INDUCTION_API;
+  const openRouterApiKey = process.env.WORD_INDUCTION_API;
+  const openRouterModel = process.env.WORD_INDUCTION_MODEL || 'openrouter/auto';
 
-  if (!roundtableApi && !fallbackApiKey) {
-    return res.status(500).json({ error: 'Server configuration error: missing ROUNDTABLE_API.' });
+  if (!roundtableApi && !openRouterApiKey) {
+    return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API or ROUNDTABLE_API URL.' });
   }
 
   try {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ systemPrompt, userQuery })
       });
     } else {
-      const apiKey = roundtableApi || fallbackApiKey;
+      const apiKey = openRouterApiKey || roundtableApi;
       response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
           'X-Title': 'WORD INDUCTION'
         },
         body: JSON.stringify({
-          model: 'openrouter/auto',
+          model: openRouterModel,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userQuery }
