@@ -8,11 +8,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'systemPrompt and userQuery are required.' });
   }
 
-  const roundtableApi = process.env.ROUNDTABLE_API;
-  const fallbackApiKey = process.env.WORD_INDUCTION_API;
+  const roundtableApi = (process.env.ROUNDTABLE_API || '').trim();
+  const openRouterApiKey = normalizeApiKey(process.env.WORD_INDUCTION_API);
+  const openRouterModel = 'openrouter/auto';
 
-  if (!roundtableApi && !fallbackApiKey) {
-    return res.status(500).json({ error: 'Server configuration error: missing ROUNDTABLE_API.' });
+  if (!roundtableApi && !openRouterApiKey) {
+    return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API or ROUNDTABLE_API URL.' });
   }
 
   try {
@@ -25,7 +26,11 @@ export default async function handler(req, res) {
         body: JSON.stringify({ systemPrompt, userQuery })
       });
     } else {
-      const apiKey = roundtableApi || fallbackApiKey;
+      if (!openRouterApiKey) {
+        return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API for OpenRouter.' });
+      }
+
+      const apiKey = openRouterApiKey;
       response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -35,7 +40,7 @@ export default async function handler(req, res) {
           'X-Title': 'WORD INDUCTION'
         },
         body: JSON.stringify({
-          model: 'openrouter/auto',
+          model: openRouterModel,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userQuery }
@@ -46,7 +51,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+      const apiError = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+      const hint = /user not found/i.test(String(apiError))
+        ? ' (check WORD_INDUCTION_API: use your raw OpenRouter key, not model name, URL, or Bearer prefix)'
+        : '';
+      throw new Error(`${apiError}${hint}`);
     }
 
     const data = await response.json();
@@ -54,4 +63,12 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Unknown server error' });
   }
+}
+
+function normalizeApiKey(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^Bearer\s+/i, '');
 }
