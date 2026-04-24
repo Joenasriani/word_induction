@@ -197,6 +197,7 @@ const App = () => {
     const [inductionMode, setInductionMode] = useState('script'); 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDecoding, setIsDecoding] = useState(false);
+    const [apiKey, setApiKey] = useState('');
 
     const audioCtx = useRef(null);
     const maskNodes = useRef({});
@@ -226,8 +227,17 @@ const App = () => {
             if (bg) setBgFile({ name: bg.name, data: bg.data });
             const vc = await dbGet('assets', 'voice');
             if (vc) setVoiceFile({ name: vc.name, data: vc.data });
+            const cfgKey = await dbGet('config', 'openrouter_api_key');
+            if (cfgKey?.value) setApiKey(cfgKey.value);
         })();
     }, []);
+
+    const persistApiKey = async (rawValue) => {
+        const cleaned = String(rawValue || '').trim().replace(/^Bearer\s+/i, '');
+        setApiKey(cleaned);
+        await dbPut('config', { id: 'openrouter_api_key', value: cleaned });
+        notify(cleaned ? 'API key stored locally.' : 'Local API key removed.', 'success');
+    };
 
     const handleFile = async (e, type) => {
         const file = e.target.files[0];
@@ -440,7 +450,8 @@ const App = () => {
             const res = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(apiKey ? { 'X-OpenRouter-API-Key': apiKey } : {})
                 },
                 body: JSON.stringify({ systemPrompt, userQuery })
             });
@@ -506,7 +517,24 @@ const App = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="text-[0.55rem] font-mono text-slate-400">AI generation is server-routed through WORD_INDUCTION_API on OpenRouter model openrouter/auto.</div>
+                            <div className="text-[0.55rem] font-mono text-slate-400">AI generation uses OpenRouter model openrouter/auto. Use server env WORD_INDUCTION_API, or paste your key below for local fallback.</div>
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <input
+                                    type="password"
+                                    value={apiKey}
+                                    onChange={e => setApiKey(e.target.value)}
+                                    className="flex-1 bg-black border border-white/10 rounded-2xl p-3 text-xs font-mono focus:border-indigo-500 outline-none"
+                                    placeholder="Optional local fallback API key (sk-or-v1-...)"
+                                    autoComplete="off"
+                                    spellCheck="false"
+                                />
+                                <button
+                                    onClick={() => persistApiKey(apiKey)}
+                                    className="px-5 py-3 bg-slate-700 hover:bg-slate-600 rounded-2xl text-[0.55rem] font-black uppercase tracking-widest transition-all"
+                                >
+                                    Save Key
+                                </button>
+                            </div>
                             <div className="flex flex-col md:flex-row gap-4">
                                 <input type="text" value={targetWord} onChange={e => setTargetWord(e.target.value)} className="flex-1 bg-black border border-white/10 rounded-2xl p-4 text-sm font-bold focus:border-indigo-500 outline-none" placeholder="Target concept..." onKeyDown={e => e.key === 'Enter' && generateInduction()} />
                                 <button onClick={generateInduction} disabled={isGenerating} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[0.6rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 transition-all">
