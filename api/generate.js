@@ -4,55 +4,39 @@ export default async function handler(req, res) {
   }
 
   const { systemPrompt, userQuery } = req.body || {};
-  if (!systemPrompt || !userQuery) {
+  if (!String(systemPrompt || '').trim() || !String(userQuery || '').trim()) {
     return res.status(400).json({ error: 'systemPrompt and userQuery are required.' });
   }
 
-  const roundtableApi = (process.env.ROUNDTABLE_API || '').trim();
   const openRouterApiKey = normalizeApiKey(process.env.WORD_INDUCTION_API);
   const openRouterModel = 'openrouter/auto';
 
-  if (!roundtableApi && !openRouterApiKey) {
-    return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API or ROUNDTABLE_API URL.' });
+  if (!openRouterApiKey) {
+    return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API.' });
   }
 
   try {
-    let response;
-
-    if (roundtableApi && /^https?:\/\//i.test(roundtableApi)) {
-      response = await fetch(roundtableApi, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemPrompt, userQuery })
-      });
-    } else {
-      if (!openRouterApiKey) {
-        return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API for OpenRouter.' });
-      }
-
-      const apiKey = openRouterApiKey;
-      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://word-induction.vercel.app',
-          'X-Title': 'WORD INDUCTION'
-        },
-        body: JSON.stringify({
-          model: openRouterModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userQuery }
-          ]
-        })
-      });
-    }
+    const response = await fetchWithRetry('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openRouterApiKey}`,
+        'HTTP-Referer': 'https://word-induction.vercel.app',
+        'X-Title': 'WORD INDUCTION'
+      },
+      body: JSON.stringify({
+        model: openRouterModel,
+        messages: [
+          { role: 'system', content: String(systemPrompt).trim() },
+          { role: 'user', content: String(userQuery).trim() }
+        ]
+      })
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const apiError = errorData.error?.message || errorData.error || `API error: ${response.status}`;
-      const hint = /user not found/i.test(String(apiError))
+      const hint = /user not found|invalid api key|unauthorized/i.test(String(apiError))
         ? ' (check WORD_INDUCTION_API: use your raw OpenRouter key, not model name, URL, or Bearer prefix)'
         : '';
       throw new Error(`${apiError}${hint}`);
@@ -71,4 +55,31 @@ function normalizeApiKey(raw) {
     .trim()
     .replace(/^['"]|['"]$/g, '')
     .replace(/^Bearer\s+/i, '');
+}
+
+async function fetchWithRetry(url, options, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+      if (response.status === 429 || response.status >= 500) {
+        if (attempt < retries) {
+          await wait(350 * (attempt + 1));
+          continue;
+        }
+      }
+      return response;
+    } catch (error) {
+      clearTimeout(timeout);
+      if (attempt >= retries) throw error;
+      await wait(350 * (attempt + 1));
+    }
+  }
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

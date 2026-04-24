@@ -196,8 +196,6 @@ const App = () => {
     const [inductionScript, setInductionScript] = useState('');
     const [inductionMode, setInductionMode] = useState('script'); 
     const [isGenerating, setIsGenerating] = useState(false);
-    const [apiKey, setApiKey] = useState(''); 
-    const [showConfig, setShowConfig] = useState(false);
     const [isDecoding, setIsDecoding] = useState(false);
 
     const audioCtx = useRef(null);
@@ -224,21 +222,12 @@ const App = () => {
 
     useEffect(() => {
         (async () => {
-            const conf = await dbGet('config', 'api');
-            if (conf && conf.key) setApiKey(conf.key);
-            else setApiKey('');
             const bg = await dbGet('assets', 'bg');
             if (bg) setBgFile({ name: bg.name, data: bg.data });
             const vc = await dbGet('assets', 'voice');
             if (vc) setVoiceFile({ name: vc.name, data: vc.data });
         })();
     }, []);
-
-    const saveApiKey = async () => {
-        await dbPut('config', { id: 'api', key: apiKey });
-        notify('Credentials secured.', 'success');
-        setShowConfig(false);
-    };
 
     const handleFile = async (e, type) => {
         const file = e.target.files[0];
@@ -517,14 +506,7 @@ const App = () => {
                                     </button>
                                 </div>
                             </div>
-                            {showConfig && <div className="p-6 bg-black/40 rounded-2xl border border-white/5 space-y-4">
-                                <label className="text-[0.55rem] font-black text-slate-500 uppercase tracking-widest">OpenRouter API Key</label>
-                                <div className="flex gap-2">
-                                    <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} className="flex-1 bg-black border border-white/10 rounded-xl p-3 text-xs font-mono outline-none focus:border-indigo-500" placeholder="Managed server key" />
-                                    <button onClick={saveApiKey} className="px-6 py-2 bg-indigo-600 rounded-xl text-[0.6rem] font-black uppercase tracking-widest hover:bg-indigo-500 transition-colors">Authorize</button>
-                                </div>
-                                <div className="text-[0.55rem] font-mono text-slate-400">API is now routed through /api/generate (server-managed key)</div>
-                            </div>}
+                            <div className="text-[0.55rem] font-mono text-slate-400">AI generation is server-routed through WORD_INDUCTION_API on OpenRouter model openrouter/auto.</div>
                             <div className="flex flex-col md:flex-row gap-4">
                                 <input type="text" value={targetWord} onChange={e => setTargetWord(e.target.value)} className="flex-1 bg-black border border-white/10 rounded-2xl p-4 text-sm font-bold focus:border-indigo-500 outline-none" placeholder="Target concept..." onKeyDown={e => e.key === 'Enter' && generateInduction()} />
                                 <button onClick={generateInduction} disabled={isGenerating} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[0.6rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 transition-all">
