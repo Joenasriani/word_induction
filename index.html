@@ -506,7 +506,7 @@ const App = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="text-[0.55rem] font-mono text-slate-400">AI generation is server-routed through WORD_INDUCTION_API on OpenRouter model openrouter/auto.</div>
+                            <div className="text-[0.55rem] font-mono text-slate-400">AI generation is server-routed through OpenRouter model openrouter/auto using server env key WORD_INDUCTION_API (or OPENROUTER_API_KEY).</div>
                             <div className="flex flex-col md:flex-row gap-4">
                                 <input type="text" value={targetWord} onChange={e => setTargetWord(e.target.value)} className="flex-1 bg-black border border-white/10 rounded-2xl p-4 text-sm font-bold focus:border-indigo-500 outline-none" placeholder="Target concept..." onKeyDown={e => e.key === 'Enter' && generateInduction()} />
                                 <button onClick={generateInduction} disabled={isGenerating} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[0.6rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 transition-all">
