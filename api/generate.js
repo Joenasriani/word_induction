@@ -5,20 +5,18 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
   const { systemPrompt, userQuery } = body;
+
   if (!String(systemPrompt || '').trim() || !String(userQuery || '').trim()) {
     return res.status(400).json({ error: 'systemPrompt and userQuery are required.' });
   }
 
-  const headerApiKey = normalizeApiKey(
-    req.headers['x-openrouter-api-key'] || req.headers['x-word-induction-api'] || ''
-  );
-  const openRouterApiKey = headerApiKey || getOpenRouterApiKey();
-  const openRouterModel = 'openrouter/auto';
+  const openRouterApiKey = getOpenRouterApiKey();
+  const openRouterModel = 'openrouter/free';
 
   if (!openRouterApiKey) {
     return res.status(500).json({
       error:
-        'Server configuration error: missing OpenRouter API key. Set WORD_INDUCTION_API (preferred) on the server, or send X-OpenRouter-API-Key from the app.'
+        'Server configuration error: missing OpenRouter API key. Set WORD_INDUCTION_API or OPENROUTER_API_KEY in Vercel environment variables and redeploy.'
     });
   }
 
@@ -29,7 +27,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${openRouterApiKey}`,
         'HTTP-Referer': 'https://word-induction.vercel.app',
-        'X-Title': 'WORD INDUCTION'
+        'X-OpenRouter-Title': 'WORD INDUCTION'
       },
       body: JSON.stringify({
         model: openRouterModel,
@@ -43,9 +41,11 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const apiError = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+
       const hint = /user not found|invalid api key|unauthorized/i.test(String(apiError))
-        ? ' (check WORD_INDUCTION_API: use your raw OpenRouter key, not model name, URL, or Bearer prefix)'
+        ? ' Check your OpenRouter key. Use the raw key only, without Bearer, URL, or model name.'
         : '';
+
       throw new Error(`${apiError}${hint}`);
     }
 
@@ -59,9 +59,9 @@ export default async function handler(req, res) {
 function getOpenRouterApiKey() {
   return normalizeApiKey(
     process.env.WORD_INDUCTION_API ||
-    process.env.OPENROUTER_API_KEY ||
-    process.env.OPEN_ROUTER_API_KEY ||
-    ''
+      process.env.OPENROUTER_API_KEY ||
+      process.env.OPEN_ROUTER_API_KEY ||
+      ''
   );
 }
 
@@ -89,12 +89,12 @@ async function fetchWithRetry(url, options, retries = 2) {
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeout);
-      if (response.status === 429 || response.status >= 500) {
-        if (attempt < retries) {
-          await wait(350 * (attempt + 1));
-          continue;
-        }
+
+      if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+        await wait(350 * (attempt + 1));
+        continue;
       }
+
       return response;
     } catch (error) {
       clearTimeout(timeout);
