@@ -3,16 +3,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { systemPrompt, userQuery } = req.body || {};
+  const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
+  const { systemPrompt, userQuery } = body;
   if (!String(systemPrompt || '').trim() || !String(userQuery || '').trim()) {
     return res.status(400).json({ error: 'systemPrompt and userQuery are required.' });
   }
 
-  const openRouterApiKey = normalizeApiKey(process.env.WORD_INDUCTION_API);
+  const openRouterApiKey = getOpenRouterApiKey();
   const openRouterModel = 'openrouter/auto';
 
   if (!openRouterApiKey) {
-    return res.status(500).json({ error: 'Server configuration error: missing WORD_INDUCTION_API.' });
+    return res.status(500).json({
+      error:
+        'Server configuration error: missing OpenRouter API key. Set WORD_INDUCTION_API (preferred) or OPENROUTER_API_KEY in server environment variables and redeploy.'
+    });
   }
 
   try {
@@ -46,6 +50,23 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Unknown server error' });
+  }
+}
+
+function getOpenRouterApiKey() {
+  return normalizeApiKey(
+    process.env.WORD_INDUCTION_API ||
+    process.env.OPENROUTER_API_KEY ||
+    process.env.OPEN_ROUTER_API_KEY ||
+    ''
+  );
+}
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
   }
 }
 
