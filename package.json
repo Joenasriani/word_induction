@@ -1,0 +1,9 @@
+{
+  "name": "word-induction",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test qa/*.test.mjs",
+    "validate:e2e": "node qa/e2e_validation.mjs"
+  }
+}
